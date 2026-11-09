@@ -4,96 +4,397 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cuatro en Línea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #f4f1ea; --fg: #1f2328; --board: #2f3e46; --p1: #e76f51; --p2: #2a9d8f; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #14181b; --fg: #e8e6e3; --board: #354f52; } }
+  :root {
+    --bg: #eef2fb; --fg: #13203d; --muted: #5b6785; --card: #fff; --line: #d5dcef; --accent: #1f5fd6;
+    --board: #1f5fd6; --board-hi: #4a86f2; --board-lo: #1546a8; --hole: #dfe6f5;
+    --p1: #ff8a3d; --p2: #22d3bb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b1226; --fg: #e8edf9; --muted: #9aa6c4; --card: #141e3a; --line: #26335a; --accent: #4f86f5; --hole: #070d20; }
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 1rem;
-         padding: 16px; background: var(--bg); color: var(--fg); font: 1.1rem system-ui, sans-serif; }
-  h1 { margin: 0; font-size: 1.6rem; }
-  #status { margin: 0; min-height: 1.5em; }
-  .dot { display: inline-block; width: .9em; height: .9em; border-radius: 50%; vertical-align: -.1em; }
-  #board { display: flex; gap: 6px; padding: 10px; width: min(92vw, 520px); background: var(--board); border-radius: 16px; }
-  .col { flex: 1; display: flex; flex-direction: column-reverse; gap: 6px; padding: 0; border: 0;
-         background: none; border-radius: 999px; cursor: pointer; }
-  .col:hover:not(:disabled) { background: rgb(255 255 255 / .12); }
-  .col:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
-  .col:disabled { cursor: default; }
-  .cell { aspect-ratio: 1; border-radius: 50%; background: var(--bg); }
-  .cell i { position: relative; z-index: 1; display: block; height: 100%; border-radius: 50%;
-            animation: drop .4s ease-in; }
-  .cell i.win { box-shadow: inset 0 0 0 .3em rgb(255 255 255 / .75); }
-  @keyframes drop { from { transform: translateY(calc(var(--n) * (-100% - 6px))); } }
-  @media (prefers-reduced-motion: reduce) { .cell i { animation: none; } }
-  button.reset { font: inherit; padding: .5em 1.2em; border: 2px solid var(--fg); border-radius: 8px;
-                 background: none; color: var(--fg); cursor: pointer; }
+  body { margin: 0; min-height: 100dvh; display: flex; justify-content: center; padding: 16px;
+         background: var(--bg); color: var(--fg); font: 500 16px/1.4 Fredoka, system-ui, sans-serif; }
+  main { width: min(100%, 560px); display: flex; flex-direction: column; gap: 14px; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  header { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  h1 { margin: 0; font-size: clamp(1.5rem, 6vw, 2rem); font-weight: 700; letter-spacing: -.01em; }
+  .logo { display: flex; gap: 3px; }
+  .logo .disc { width: 18px; animation: fall-in .6s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .logo .disc:nth-child(2) { animation-delay: .1s; } .logo .disc:nth-child(3) { animation-delay: .2s; } .logo .disc:nth-child(4) { animation-delay: .3s; }
+  @keyframes fall-in { from { transform: translateY(-30px); opacity: 0; } }
+
+  /* A disc in color --pc: shaded body plus an embossed ring. */
+  .disc { display: block; aspect-ratio: 1; border-radius: 50%;
+    background:
+      radial-gradient(circle closest-side, transparent 64%, rgb(0 0 0 / .16) 66% 72%, transparent 74%),
+      radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--pc) 45%, #fff), var(--pc) 45%, color-mix(in srgb, var(--pc) 72%, #000)); }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px;
+           display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 30px rgb(20 40 100 / .08); }
+  .lead { margin: 0; font-size: 1.2rem; text-align: center; }
+  label { font-weight: 600; }
+  input { font: inherit; padding: .7em .9em; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; }
+  .row { display: flex; gap: 8px; } .row input { flex: 1; }
+  .btn { font: inherit; font-weight: 600; padding: .75em 1.2em; border: 0; border-radius: 12px; cursor: pointer;
+         background: var(--accent); color: #fff; transition: transform .15s, filter .15s; }
+  .btn:hover { filter: brightness(1.12); } .btn:active { transform: scale(.96); }
+  .btn.ghost { background: none; color: var(--fg); border: 1px solid var(--line); }
+  .msg { margin: 0; color: #e5484d; } .msg:empty { display: none; }
+  .waiting { margin: 0; text-align: center; color: var(--muted); }
+
+  /* HUD */
+  #game { display: flex; flex-direction: column; gap: 14px; }
+  .hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+  .player { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-width: 0; border-radius: 16px;
+            background: var(--card); border: 2px solid var(--line); opacity: .55; transition: .3s; }
+  .player.p2 { flex-direction: row-reverse; text-align: right; }
+  .player.turn { opacity: 1; border-color: var(--pc); transform: scale(1.04); box-shadow: 0 0 0 5px color-mix(in srgb, var(--pc) 22%, transparent); }
+  .player.turn > .disc { animation: bob .8s ease-in-out infinite alternate; }
+  .player > .disc { width: 30px; flex: none; }
+  .who { min-width: 0; flex: 1; }
+  .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who small { color: var(--muted); }
+  .score { font-size: 1.7rem; font-weight: 700; }
+  .score.bump { animation: bump .6s cubic-bezier(.3, 1.8, .5, 1); }
+  @keyframes bump { 40% { transform: scale(1.7); color: var(--pc); } }
+  .vs { color: var(--muted); font-weight: 700; }
+
+  /* Board: pieces sit behind a blue frame with holes, so they fall "inside" it. */
+  .stage { width: min(100%, max(300px, 100dvh - 300px)); margin-inline: auto; }
+  .preview { padding: 0 12px; }
+  #ghost { width: calc(100% / 7); transform: translateX(calc(var(--c, 3) * 100%)); transition: transform .15s ease-out, opacity .2s; }
+  #ghost .disc { width: 78%; margin: 11% auto; animation: bob .8s ease-in-out infinite alternate; }
+  #ghost.off { opacity: 0; }
+  @keyframes bob { to { transform: translateY(-10%); } }
+  .board-wrap { padding: 12px; border-radius: 20px; background: linear-gradient(170deg, var(--board-hi), var(--board) 35%, var(--board-lo));
+                box-shadow: 0 16px 34px rgb(10 30 90 / .35), inset 0 2px 0 rgb(255 255 255 / .3), inset 0 -3px 0 rgb(0 0 0 / .2); }
+  .board-wrap.shake { animation: shake .6s; }
+  @keyframes shake { 15%, 55% { translate: -9px; } 35%, 75% { translate: 9px; } }
+  .board { position: relative; aspect-ratio: 7 / 6; overflow: hidden; border-radius: 6px; background: var(--hole); }
+  .pieces, .frame, .cols, #winline { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pieces { display: grid; grid-template: repeat(6, 1fr) / repeat(7, 1fr); }
+  .piece { grid-area: var(--row) / var(--col); padding: 8%; animation: drop var(--d) both; }
+  .piece .disc { height: 100%; transition: filter .6s; }
+  .board.done .piece:not(.win) .disc { filter: saturate(.35) brightness(.65); }
+  .piece.win .disc { animation: glow .5s ease-in-out infinite alternate; }
+  @keyframes glow { to { filter: brightness(1.35); box-shadow: inset 0 0 0 .3em rgb(255 255 255 / .8); } }
+  /* Starts just above the board, accelerates down, then two shrinking bounces. */
+  @keyframes drop {
+    0% { transform: translateY(calc(var(--row) * -100%)); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+    55% { transform: translateY(0); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+    72% { transform: translateY(-22%); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+    86% { transform: translateY(0); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+    93% { transform: translateY(-6%); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+    100% { transform: translateY(0); }
+  }
+  .frame { pointer-events: none;
+    background:
+      radial-gradient(circle closest-side, transparent 79%, rgb(0 0 0 / .35) 80%, transparent 92%),
+      radial-gradient(circle closest-side, transparent 79.5%, var(--board) 80.5%);
+    background-size: calc(100% / 7) calc(100% / 6); }
+  #winline { pointer-events: none; filter: drop-shadow(0 0 3px rgb(0 0 0 / .6)); }
+  #winline:not(.show) { display: none; }
+  #winline line { stroke: #fff; stroke-width: .14; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .5s .1s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .cols { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cols button { border: 0; padding: 0; background: none; cursor: pointer; border-radius: 10px; }
+  .cols button:hover:not(:disabled) { background: rgb(255 255 255 / .1); }
+  .cols button:focus-visible { outline-offset: -4px; outline-color: #fff; }
+  .cols button:disabled { cursor: default; }
+
+  #status { margin: 0; min-height: 1.4em; text-align: center; color: var(--muted); font-size: 1.1rem; }
+  .banner { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 18px;
+            background: var(--card); border: 2px solid var(--line); animation: pop .5s cubic-bezier(.3, 1.6, .5, 1); }
+  .banner strong { flex: 1; font-size: 1.25rem; }
+  .banner .big { font-size: 2.2rem; line-height: 1; animation: wiggle 1s ease-in-out infinite alternate; }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } }
+  @keyframes wiggle { from { rotate: -12deg; } to { rotate: 12deg; } }
+  .exit { align-self: center; }
+
+  .confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 10; }
+  .confetti i { position: absolute; top: -16px; width: 9px; height: 15px; border-radius: 2px; animation: confetti linear forwards; }
+  @keyframes confetti { to { transform: translate(var(--x), 110vh) rotate(var(--r)); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    #winline line { stroke-dashoffset: 0; }
+  }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"
+        integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR" crossorigin="anonymous"></script>
 </head>
 <body>
-<h1>Cuatro en Línea</h1>
-<p id="status" aria-live="polite"></p>
-<div id="board"></div>
-<button class="reset" onclick="reset()">Nueva partida</button>
+<main>
+  <header>
+    <div class="logo" aria-hidden="true">
+      <span class="disc" style="--pc:var(--p1)"></span><span class="disc" style="--pc:var(--p2)"></span><span class="disc" style="--pc:var(--p1)"></span><span class="disc" style="--pc:var(--p2)"></span>
+    </div>
+    <h1>Cuatro en Línea</h1>
+  </header>
+
+  <section id="menu" class="panel">
+    <p id="invited" class="lead" hidden>🎉 ¡Te invitaron a una partida!</p>
+    <label for="name">Tu nombre</label>
+    <input id="name" maxlength="16" autocomplete="nickname" placeholder="¿Cómo te llamas?">
+    <button id="join" class="btn" hidden>Unirse a la partida</button>
+    <button id="host" class="btn">🔗 Invitar a un amigo</button>
+    <button id="local" class="btn ghost">👥 Jugar los dos en este PC</button>
+    <p id="menu-msg" class="msg" role="alert"></p>
+  </section>
+
+  <section id="lobby" class="panel" hidden>
+    <div id="invite" class="panel" style="padding:0;border:0;box-shadow:none" hidden>
+      <label for="link">Envía este enlace a tu amigo</label>
+      <div class="row"><input id="link" readonly><button id="copy" class="btn">Copiar</button></div>
+      <button id="share" class="btn ghost" hidden>Compartir…</button>
+    </div>
+    <p id="lobby-msg" class="waiting" aria-live="polite">Creando partida…</p>
+    <button class="btn ghost exit">Cancelar</button>
+  </section>
+
+  <section id="game" hidden>
+    <div class="hud">
+      <div class="player" id="pl1" style="--pc:var(--p1)"><span class="disc"></span><div class="who"><div class="name"></div><small></small></div><b class="score">0</b></div>
+      <span class="vs">VS</span>
+      <div class="player p2" id="pl2" style="--pc:var(--p2)"><span class="disc"></span><div class="who"><div class="name"></div><small></small></div><b class="score">0</b></div>
+    </div>
+    <div class="stage">
+      <div class="preview" aria-hidden="true"><div id="ghost"><span class="disc"></span></div></div>
+      <div class="board-wrap" id="wrap">
+        <div class="board" id="board">
+          <div class="pieces" id="pieces"></div>
+          <div class="frame"></div>
+          <svg id="winline" viewBox="0 0 7 6" aria-hidden="true"><line pathLength="1" /></svg>
+          <div class="cols" id="cols"></div>
+        </div>
+      </div>
+    </div>
+    <div aria-live="polite">
+      <p id="status"></p>
+      <div id="banner" class="banner" hidden><span class="big"></span><strong></strong><button id="again" class="btn">Revancha</button></div>
+    </div>
+    <button class="btn ghost exit">Salir</button>
+  </section>
+</main>
 
 <script src="game.js"></script>
 <script>
-  const names = ['', 'Naranja', 'Verde'];
-  const dot = p => `<span class="dot" style="background:var(--p${p})"></span> ${names[p]}`;
-  const boardEl = document.getElementById('board'), statusEl = document.getElementById('status');
-  let board, player, over;
+  const $ = id => document.getElementById(id);
+  const inviteId = new URLSearchParams(location.search).get('partida');
+  let mode, me = 0, names, score, round, board, turn, over, conn, gone = false, pieceAt;
+
+  try { $('name').value = localStorage.getItem('nombre') || ''; } catch {}
+  function myName(fallback) {
+    const n = $('name').value.trim().slice(0, 16);
+    try { localStorage.setItem('nombre', n); } catch {}
+    return n || fallback;
+  }
+
+  if (inviteId) { $('invited').hidden = $('join').hidden = false; $('host').hidden = $('local').hidden = true; }
+  $('name').onkeydown = e => { if (e.key === 'Enter') $(inviteId ? 'join' : 'host').click(); };
+  const show = id => { for (const s of ['menu', 'lobby', 'game']) $(s).hidden = s !== id; };
+  for (const b of document.querySelectorAll('.exit')) b.onclick = () => location.href = location.pathname;
 
   for (let c = 0; c < COLS; c++) {
-    const col = document.createElement('button');
-    col.className = 'col';
-    col.innerHTML = '<span class="cell"></span>'.repeat(ROWS);
-    col.onclick = () => play(c);
-    boardEl.append(col);
-  }
-  const cols = boardEl.children;
-
-  function label(c) {
-    const pieces = board[c].map(p => names[p]).join(', ') || 'vacía';
-    cols[c].setAttribute('aria-label', `Columna ${c + 1}: ${pieces}`);
+    const b = document.createElement('button');
+    b.onclick = () => myMove(c);
+    b.onmouseenter = b.onfocus = () => $('ghost').style.setProperty('--c', c);
+    $('cols').append(b);
   }
 
-  function reset() {
-    board = Array.from({ length: COLS }, () => []);
-    player = 1;
-    over = false;
-    for (let c = 0; c < COLS; c++) {
-      cols[c].disabled = false;
-      for (const cell of cols[c].children) cell.replaceChildren();
-      label(c);
+  $('local').onclick = () => { mode = 'local'; startMatch(myName('Jugador 1'), 'Jugador 2'); };
+  $('host').onclick = () => online(1);
+  $('join').onclick = () => online(2);
+  $('again').onclick = () => {
+    if (mode === 'online') { if (gone) return; conn.send({ t: 'revancha', n: round + 1 }); }
+    newRound(round + 1);
+  };
+
+  function startMatch(n1, n2) {
+    names = ['', n1, n2];
+    score = [0, 0, 0];
+    gone = false;
+    const tags = mode === 'local' ? ['', 'Naranja', 'Turquesa'] : ['', ...[1, 2].map(p => p === me ? 'Tú' : 'Tu amigo')];
+    for (const p of [1, 2]) {
+      $('pl' + p).querySelector('.name').textContent = names[p];
+      $('pl' + p).querySelector('small').textContent = tags[p];
     }
-    statusEl.innerHTML = `Turno: ${dot(player)}`;
+    show('game');
+    newRound(1);
   }
 
-  function play(c) {
-    if (over || board[c].length === ROWS) return;
-    const r = board[c].push(player) - 1;
-    const disc = document.createElement('i');
-    disc.style.background = `var(--p${player})`;
-    disc.style.setProperty('--n', ROWS - r);
-    cols[c].children[r].append(disc);
-    label(c);
-    cols[c].disabled = board[c].length === ROWS;
+  function newRound(n) {
+    round = n;
+    over = false;
+    board = Array.from({ length: COLS }, () => []);
+    pieceAt = {};
+    turn = n % 2 ? 1 : 2; // starter alternates every round
+    $('pieces').replaceChildren();
+    $('winline').classList.remove('show');
+    $('board').classList.remove('done');
+    $('wrap').classList.remove('shake');
+    $('banner').hidden = true;
+    $('status').hidden = false;
+    update();
+  }
+
+  const canPlay = () => !over && !gone && (mode === 'local' || turn === me);
+
+  function update() {
+    const playable = canPlay();
+    [...$('cols').children].forEach((b, c) => {
+      b.disabled = !playable || !canDrop(board, c);
+      b.setAttribute('aria-label', `Columna ${c + 1}: ${board[c].map(p => names[p]).join(', ') || 'vacía'}`);
+    });
+    for (const p of [1, 2]) {
+      $('pl' + p).classList.toggle('turn', !over && turn === p);
+      $('pl' + p).querySelector('.score').textContent = score[p];
+    }
+    $('ghost').style.setProperty('--pc', `var(--p${turn})`);
+    $('ghost').classList.toggle('off', !playable);
+    $('status').textContent = gone ? 'Tu amigo se desconectó 😕' : over ? ''
+      : mode === 'local' ? `Turno de ${names[turn]}`
+      : turn === me ? '¡Te toca! Elige una columna' : `Esperando la jugada de ${names[turn]}…`;
+  }
+
+  function myMove(c) {
+    if (!canPlay() || !canDrop(board, c)) return;
+    if (mode === 'online') conn.send({ t: 'jugada', c, n: round });
+    drop(c);
+  }
+
+  function drop(c) {
+    const r = board[c].push(turn) - 1, row = ROWS - r, secs = .35 + .07 * row;
+    const p = document.createElement('div');
+    p.className = 'piece';
+    p.style.cssText = `--col:${c + 1};--row:${row};--pc:var(--p${turn});--d:${secs}s`;
+    p.innerHTML = '<span class="disc"></span>';
+    $('pieces').append(p);
+    pieceAt[c + ',' + r] = p;
 
     const line = winLine(board, c, r);
-    if (line) {
-      over = true;
-      for (const [x, y] of line) cols[x].children[y].firstChild.classList.add('win');
-      statusEl.innerHTML = `¡Gana ${dot(player)}!`;
-    } else if (board.every(col => col.length === ROWS)) {
-      over = true;
-      statusEl.textContent = 'Empate';
-    } else {
-      player = 3 - player;
-      statusEl.innerHTML = `Columna ${c + 1}. Turno: ${dot(player)}`;
-    }
-    if (over) for (const col of cols) col.disabled = true;
+    if (line) end(turn, line, secs);
+    else if (board.every(col => col.length === ROWS)) end(0, null, secs);
+    else turn = 3 - turn;
+    update();
   }
 
-  reset();
+  function end(winner, line, secs) {
+    over = true;
+    if (winner) score[winner]++;
+    const n = round;
+    setTimeout(() => { // wait for the last piece to land
+      if (n !== round) return;
+      $('board').classList.add('done');
+      if (line) {
+        for (const [x, y] of line) pieceAt[x + ',' + y].classList.add('win');
+        const pts = line.map(([x, y]) => [x + .5, ROWS - y - .5]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        const l = $('winline').firstElementChild;
+        [['x1', pts[0][0]], ['y1', pts[0][1]], ['x2', pts.at(-1)[0]], ['y2', pts.at(-1)[1]]].forEach(([k, v]) => l.setAttribute(k, v));
+        $('winline').classList.add('show');
+        const s = $('pl' + winner).querySelector('.score');
+        s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump');
+      }
+      const happy = winner && (mode === 'local' || winner === me);
+      const [emoji, text] = !winner ? ['🤝', '¡Empate!']
+        : mode === 'local' ? ['🎉', `¡Gana ${names[winner]}!`]
+        : happy ? ['🏆', '¡Ganaste!'] : ['😢', `Ganó ${names[winner]}… ¡pide la revancha!`];
+      if (happy) confetti(); else if (winner) $('wrap').classList.add('shake');
+      $('banner').querySelector('.big').textContent = emoji;
+      $('banner').querySelector('strong').textContent = text;
+      $('status').hidden = true;
+      $('banner').hidden = gone;
+    }, secs * 1000);
+  }
+
+  function confetti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const box = document.createElement('div');
+    box.className = 'confetti';
+    const colors = ['var(--p1)', 'var(--p2)', '#ffd43b', '#4f86f5', '#fff'];
+    for (let i = 0; i < 140; i++) {
+      const s = document.createElement('i');
+      s.style.cssText = `left:${Math.random() * 100}%;background:${colors[i % 5]};animation-duration:${2 + Math.random() * 2}s;` +
+        `animation-delay:${Math.random() * .7}s;--x:${(Math.random() - .5) * 240}px;--r:${(Math.random() - .5) * 1440}deg`;
+      box.append(s);
+    }
+    document.body.append(box);
+    setTimeout(() => box.remove(), 5000);
+  }
+
+  // Online: WebRTC peer-to-peer. PeerJS's free public server only introduces the two browsers.
+  function online(role) {
+    if (!window.Peer) { $('menu-msg').textContent = 'No se pudo cargar el modo online. Revisa tu conexión a internet.'; return; }
+    mode = 'online';
+    me = role;
+    const mine = myName(role === 1 ? 'Jugador 1' : 'Jugador 2');
+    const say = t => $('lobby-msg').textContent = t;
+    show('lobby');
+    const peer = new Peer();
+    peer.on('error', e => say(e.type === 'peer-unavailable'
+      ? 'Esta partida ya no existe. Pide a tu amigo un enlace nuevo.'
+      : `Error de conexión (${e.type}). Inténtalo de nuevo.`));
+
+    const listen = c => {
+      conn?.close();
+      conn = c;
+      const lost = v => {
+        if (conn !== c) return;
+        if (!board) return v && say('Se perdió la conexión con tu amigo.');
+        gone = v;
+        $('banner').hidden = gone || !over;
+        $('status').hidden = !gone && over;
+        update();
+      };
+      c.on('open', () => c.send({ t: 'hola', name: mine }));
+      c.on('data', m => onData(m, mine));
+      c.on('close', () => lost(true));
+      // A closed tab only shows up as an ICE drop: the data channel stays "open". Recovers if ICE reconnects.
+      c.on('iceStateChanged', s => lost(['disconnected', 'failed', 'closed'].includes(s)));
+    };
+
+    if (role === 1) {
+      peer.on('open', id => {
+        $('link').value = `${location.origin}${location.pathname}?partida=${encodeURIComponent(id)}`;
+        $('invite').hidden = false;
+        say('Esperando a que tu amigo abra el enlace…');
+      });
+      peer.on('connection', c => conn?.open && !gone ? c.close() : listen(c)); // one friend at a time; rejoin after a drop
+    } else {
+      say('Conectando con tu amigo…');
+      peer.on('open', () => listen(peer.connect(inviteId, { reliable: true })));
+      setTimeout(() => { if (!conn?.open) say('No se pudo conectar. Comprueba que tu amigo tiene la partida abierta.'); }, 20000);
+    }
+  }
+
+  // Everything here comes from the other browser: validate before using it.
+  function onData(m, mine) {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'hola') {
+      const other = String(m.name ?? '').trim().slice(0, 16) || 'Amigo';
+      startMatch(...(me === 1 ? [mine, other] : [other, mine]));
+    } else if (m.t === 'jugada' && m.n === round && !over && turn === 3 - me && canDrop(board, m.c)) {
+      drop(m.c);
+    } else if (m.t === 'revancha' && Number.isInteger(m.n) && m.n > round) {
+      newRound(m.n);
+    }
+  }
+
+  $('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText($('link').value); $('copy').textContent = '¡Copiado!'; }
+    catch { $('link').select(); }
+  };
+  if (navigator.share) {
+    $('share').hidden = false;
+    $('share').onclick = () => navigator.share({ title: 'Cuatro en Línea', text: '¿Echamos una partida?', url: $('link').value }).catch(() => {});
+  }
 </script>
 </body>
 </html>

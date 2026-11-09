@@ -1,5 +1,8 @@
 const COLS = 7, ROWS = 6;
 
+// Also validates moves received from the other player, so c may be anything.
+const canDrop = (board, c) => Number.isInteger(c) && c >= 0 && c < COLS && board[c].length < ROWS;
+
 // board[c] is column c, bottom to top. Returns the winning cells through (c, r) as [c, r] pairs, or null.
 function winLine(board, c, r) {
   const p = board[c][r];
@@ -13,4 +16,4 @@ function winLine(board, c, r) {
   return null;
 }
 
-if (typeof module === 'object') module.exports = { COLS, ROWS, winLine };
+if (typeof module === 'object') module.exports = { COLS, ROWS, canDrop, winLine };
